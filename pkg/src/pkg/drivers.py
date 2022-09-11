@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import numpy as np
 
 
@@ -10,9 +12,12 @@ class GapFollower:
     CORNERS_SPEED = 6.0
     STRAIGHTS_STEERING_ANGLE = np.pi / 18  # 10 degrees
 
+    STEP_SIZE = 100
+
     def __init__(self):
         # used when calculating the angles of the LiDAR data
         self.radians_per_elem = None
+        self.i = 0
 
     def preprocess_lidar(self, ranges):
         """ Preprocess the LiDAR scan array. Expert implementation includes:
@@ -65,6 +70,10 @@ class GapFollower:
         return steering_angle
 
     def process_lidar(self, ranges):
+        if self.i % self.STEP_SIZE == 0:
+            print(list(ranges))
+        
+        self.i += 1
         """ Process each LiDAR scan as per the Follow Gap algorithm & publish an AckermannDriveStamped Message
         """
         proc_ranges = self.preprocess_lidar(ranges)
@@ -250,3 +259,21 @@ class DisparityExtender:
                                                  len(proc_ranges))
         speed = self.SPEED
         return speed, steering_angle
+
+
+class PracticeDriver:
+    CAR_WIDTH = 0.31
+
+    def __init__(self) -> None:
+        pass
+
+    def process_observation(self, ranges: np.ndarray = None, ego_odom = None) -> Tuple[float, float]:
+        speed, steering_angle = 10, -0.1
+        fov = 4.7
+        angles = np.linspace(-fov/2, fov/2, num=ranges.size)
+
+        cond_arr = np.abs(angles) <= np.pi/2
+        masked_dist = np.where(cond_arr, ranges, 0)
+        longest_idx = np.argmax(masked_dist)
+        
+        return speed, angles[longest_idx]
