@@ -1,4 +1,5 @@
-from typing import Tuple
+from typing import Optional, Tuple
+import numpy.typing as npt
 
 import numpy as np
 
@@ -20,21 +21,24 @@ class GapFollower:
         self.i = 0
 
     def preprocess_lidar(self, ranges):
-        """ Preprocess the LiDAR scan array. Expert implementation includes:
-            1.Setting each value to the mean over some window
-            2.Rejecting high values (eg. > 3m)
+        """Preprocess the LiDAR scan array. Expert implementation includes:
+        1.Setting each value to the mean over some window
+        2.Rejecting high values (eg. > 3m)
         """
         self.radians_per_elem = (2 * np.pi) / len(ranges)
         # we won't use the LiDAR data from directly behind us
         proc_ranges = np.array(ranges[135:-135])
         # sets each value to the mean over a given window
-        proc_ranges = np.convolve(proc_ranges, np.ones(self.PREPROCESS_CONV_SIZE), 'same') / self.PREPROCESS_CONV_SIZE
+        proc_ranges = (
+            np.convolve(proc_ranges, np.ones(self.PREPROCESS_CONV_SIZE), "same")
+            / self.PREPROCESS_CONV_SIZE
+        )
         proc_ranges = np.clip(proc_ranges, 0, self.MAX_LIDAR_DIST)
         return proc_ranges
 
     def find_max_gap(self, free_space_ranges):
-        """ Return the start index & end index of the max gap in free_space_ranges
-            free_space_ranges: list of LiDAR data which contains a 'bubble' of zeros
+        """Return the start index & end index of the max gap in free_space_ranges
+        free_space_ranges: list of LiDAR data which contains a 'bubble' of zeros
         """
         # mask the bubble
         masked = np.ma.masked_where(free_space_ranges == 0, free_space_ranges)
@@ -58,13 +62,16 @@ class GapFollower:
         """
         # do a sliding window average over the data in the max gap, this will
         # help the car to avoid hitting corners
-        averaged_max_gap = np.convolve(ranges[start_i:end_i], np.ones(self.BEST_POINT_CONV_SIZE),
-                                       'same') / self.BEST_POINT_CONV_SIZE
+        averaged_max_gap = (
+            np.convolve(
+                ranges[start_i:end_i], np.ones(self.BEST_POINT_CONV_SIZE), "same"
+            )
+            / self.BEST_POINT_CONV_SIZE
+        )
         return averaged_max_gap.argmax() + start_i
 
     def get_angle(self, range_index, range_len):
-        """ Get the angle of a particular element in the LiDAR data and transform it into an appropriate steering angle
-        """
+        """Get the angle of a particular element in the LiDAR data and transform it into an appropriate steering angle"""
         lidar_angle = (range_index - (range_len / 2)) * self.radians_per_elem
         steering_angle = lidar_angle / 2
         return steering_angle
@@ -72,7 +79,7 @@ class GapFollower:
     def process_lidar(self, ranges):
         if self.i % self.STEP_SIZE == 0:
             print(list(ranges))
-        
+
         self.i += 1
         """ Process each LiDAR scan as per the Follow Gap algorithm & publish an AckermannDriveStamped Message
         """
@@ -83,8 +90,10 @@ class GapFollower:
         # Eliminate all points inside 'bubble' (set them to zero)
         min_index = closest - self.BUBBLE_RADIUS
         max_index = closest + self.BUBBLE_RADIUS
-        if min_index < 0: min_index = 0
-        if max_index >= len(proc_ranges): max_index = len(proc_ranges) - 1
+        if min_index < 0:
+            min_index = 0
+        if max_index >= len(proc_ranges):
+            max_index = len(proc_ranges) - 1
         proc_ranges[min_index:max_index] = 0
 
         # Find max length gap
@@ -105,7 +114,6 @@ class GapFollower:
 
 # drives straight ahead at a speed of 5
 class SimpleDriver:
-
     def process_lidar(self, ranges):
         speed = 5.0
         steering_angle = 0.0
@@ -114,7 +122,6 @@ class SimpleDriver:
 
 # drives toward the furthest point it sees
 class AnotherDriver:
-
     def process_lidar(self, ranges):
         # the number of LiDAR points
         NUM_RANGES = len(ranges)
@@ -124,7 +131,9 @@ class AnotherDriver:
         NUM_PER_QUADRANT = NUM_RANGES // 4
 
         # the index of the furthest LiDAR point (ignoring the points behind the car)
-        max_idx = np.argmax(ranges[NUM_PER_QUADRANT:-NUM_PER_QUADRANT]) + NUM_PER_QUADRANT
+        max_idx = (
+            np.argmax(ranges[NUM_PER_QUADRANT:-NUM_PER_QUADRANT]) + NUM_PER_QUADRANT
+        )
         # some math to get the steering angle to correspond to the chosen LiDAR point
         steering_angle = max_idx * ANGLE_BETWEEN - (NUM_RANGES // 2) * ANGLE_BETWEEN
         speed = 5.0
@@ -135,34 +144,34 @@ class AnotherDriver:
 class DisparityExtender:
     CAR_WIDTH = 0.31
     # the min difference between adjacent LiDAR points for us to call them disparate
-    DIFFERENCE_THRESHOLD = 2.
-    SPEED = 5.
+    DIFFERENCE_THRESHOLD = 2.0
+    SPEED = 5.0
     # the extra safety room we plan for along walls (as a percentage of car_width/2)
-    SAFETY_PERCENTAGE = 300.
+    SAFETY_PERCENTAGE = 300.0
 
     def preprocess_lidar(self, ranges):
-        """ Any preprocessing of the LiDAR data can be done in this function.
-            Possible Improvements: smoothing of outliers in the data and placing
-            a cap on the maximum distance a point can be.
+        """Any preprocessing of the LiDAR data can be done in this function.
+        Possible Improvements: smoothing of outliers in the data and placing
+        a cap on the maximum distance a point can be.
         """
         # remove quadrant of LiDAR directly behind us
         eighth = int(len(ranges) / 8)
         return np.array(ranges[eighth:-eighth])
 
     def get_differences(self, ranges):
-        """ Gets the absolute difference between adjacent elements in
-            in the LiDAR data and returns them in an array.
-            Possible Improvements: replace for loop with numpy array arithmetic
+        """Gets the absolute difference between adjacent elements in
+        in the LiDAR data and returns them in an array.
+        Possible Improvements: replace for loop with numpy array arithmetic
         """
-        differences = [0.]  # set first element to 0
+        differences = [0.0]  # set first element to 0
         for i in range(1, len(ranges)):
             differences.append(abs(ranges[i] - ranges[i - 1]))
         return differences
 
     def get_disparities(self, differences, threshold):
-        """ Gets the indexes of the LiDAR points that were greatly
-            different to their adjacent point.
-            Possible Improvements: replace for loop with numpy array arithmetic
+        """Gets the indexes of the LiDAR points that were greatly
+        different to their adjacent point.
+        Possible Improvements: replace for loop with numpy array arithmetic
         """
         disparities = []
         for index, difference in enumerate(differences):
@@ -171,109 +180,175 @@ class DisparityExtender:
         return disparities
 
     def get_num_points_to_cover(self, dist, width):
-        """ Returns the number of LiDAR points that correspond to a width at
-            a given distance.
-            We calculate the angle that would span the width at this distance,
-            then convert this angle to the number of LiDAR points that
-            span this angle.
-            Current math for angle:
-                sin(angle/2) = (w/2)/d) = w/2d
-                angle/2 = sininv(w/2d)
-                angle = 2sininv(w/2d)
-                where w is the width to cover, and d is the distance to the close
-                point.
-            Possible Improvements: use a different method to calculate the angle
+        """Returns the number of LiDAR points that correspond to a width at
+        a given distance.
+        We calculate the angle that would span the width at this distance,
+        then convert this angle to the number of LiDAR points that
+        span this angle.
+        Current math for angle:
+            sin(angle/2) = (w/2)/d) = w/2d
+            angle/2 = sininv(w/2d)
+            angle = 2sininv(w/2d)
+            where w is the width to cover, and d is the distance to the close
+            point.
+        Possible Improvements: use a different method to calculate the angle
         """
         angle = 2 * np.arcsin(width / (2 * dist))
         num_points = int(np.ceil(angle / self.radians_per_point))
         return num_points
 
     def cover_points(self, num_points, start_idx, cover_right, ranges):
-        """ 'covers' a number of LiDAR points with the distance of a closer
-            LiDAR point, to avoid us crashing with the corner of the car.
-            num_points: the number of points to cover
-            start_idx: the LiDAR point we are using as our distance
-            cover_right: True/False, decides whether we cover the points to
-                         right or to the left of start_idx
-            ranges: the LiDAR points
+        """'covers' a number of LiDAR points with the distance of a closer
+        LiDAR point, to avoid us crashing with the corner of the car.
+        num_points: the number of points to cover
+        start_idx: the LiDAR point we are using as our distance
+        cover_right: True/False, decides whether we cover the points to
+                     right or to the left of start_idx
+        ranges: the LiDAR points
 
-            Possible improvements: reduce this function to fewer lines
+        Possible improvements: reduce this function to fewer lines
         """
         new_dist = ranges[start_idx]
         if cover_right:
             for i in range(num_points):
                 next_idx = start_idx + 1 + i
-                if next_idx >= len(ranges): break
+                if next_idx >= len(ranges):
+                    break
                 if ranges[next_idx] > new_dist:
                     ranges[next_idx] = new_dist
         else:
             for i in range(num_points):
                 next_idx = start_idx - 1 - i
-                if next_idx < 0: break
+                if next_idx < 0:
+                    break
                 if ranges[next_idx] > new_dist:
                     ranges[next_idx] = new_dist
         return ranges
 
     def extend_disparities(self, disparities, ranges, car_width, extra_pct):
-        """ For each pair of points we have decided have a large difference
-            between them, we choose which side to cover (the opposite to
-            the closer point), call the cover function, and return the
-            resultant covered array.
-            Possible Improvements: reduce to fewer lines
+        """For each pair of points we have decided have a large difference
+        between them, we choose which side to cover (the opposite to
+        the closer point), call the cover function, and return the
+        resultant covered array.
+        Possible Improvements: reduce to fewer lines
         """
         width_to_cover = (car_width / 2) * (1 + extra_pct / 100)
         for index in disparities:
             first_idx = index - 1
-            points = ranges[first_idx:first_idx + 2]
+            points = ranges[first_idx : first_idx + 2]
             close_idx = first_idx + np.argmin(points)
             far_idx = first_idx + np.argmax(points)
             close_dist = ranges[close_idx]
-            num_points_to_cover = self.get_num_points_to_cover(close_dist,
-                                                               width_to_cover)
+            num_points_to_cover = self.get_num_points_to_cover(
+                close_dist, width_to_cover
+            )
             cover_right = close_idx < far_idx
-            ranges = self.cover_points(num_points_to_cover, close_idx,
-                                       cover_right, ranges)
+            ranges = self.cover_points(
+                num_points_to_cover, close_idx, cover_right, ranges
+            )
         return ranges
 
     def get_steering_angle(self, range_index, range_len):
-        """ Calculate the angle that corresponds to a given LiDAR point and
-            process it into a steering angle.
-            Possible improvements: smoothing of aggressive steering angles
+        """Calculate the angle that corresponds to a given LiDAR point and
+        process it into a steering angle.
+        Possible improvements: smoothing of aggressive steering angles
         """
         lidar_angle = (range_index - (range_len / 2)) * self.radians_per_point
         steering_angle = np.clip(lidar_angle, np.radians(-90), np.radians(90))
         return steering_angle
 
     def process_lidar(self, ranges):
-        """ Run the disparity extender algorithm!
-            Possible improvements: varying the speed based on the
-            steering angle or the distance to the farthest point.
+        """Run the disparity extender algorithm!
+        Possible improvements: varying the speed based on the
+        steering angle or the distance to the farthest point.
         """
         self.radians_per_point = (2 * np.pi) / len(ranges)
         proc_ranges = self.preprocess_lidar(ranges)
         differences = self.get_differences(proc_ranges)
         disparities = self.get_disparities(differences, self.DIFFERENCE_THRESHOLD)
-        proc_ranges = self.extend_disparities(disparities, proc_ranges,
-                                              self.CAR_WIDTH, self.SAFETY_PERCENTAGE)
-        steering_angle = self.get_steering_angle(proc_ranges.argmax(),
-                                                 len(proc_ranges))
+        proc_ranges = self.extend_disparities(
+            disparities, proc_ranges, self.CAR_WIDTH, self.SAFETY_PERCENTAGE
+        )
+        steering_angle = self.get_steering_angle(proc_ranges.argmax(), len(proc_ranges))
         speed = self.SPEED
         return speed, steering_angle
 
 
-class PracticeDriver:
-    CAR_WIDTH = 0.31
-
+class LongestDistanceFollower:
     def __init__(self) -> None:
         pass
 
-    def process_observation(self, ranges: np.ndarray = None, ego_odom = None) -> Tuple[float, float]:
+    def process_observation(
+        self, ranges: np.ndarray = None, ego_odom=None
+    ) -> Tuple[float, float]:
         speed, steering_angle = 10, -0.1
         fov = 4.7
-        angles = np.linspace(-fov/2, fov/2, num=ranges.size)
+        angles = np.linspace(-fov / 2, fov / 2, num=ranges.size)
 
-        cond_arr = np.abs(angles) <= np.pi/2
+        cond_arr = np.abs(angles) <= np.pi / 2
         masked_dist = np.where(cond_arr, ranges, 0)
         longest_idx = np.argmax(masked_dist)
-        
+
         return speed, angles[longest_idx]
+
+
+class WallFollower:
+    CAR_WIDTH: float = 0.31
+    CAR_LENGTH: float = 0.329
+    FOV: float = 4.7
+    DT: float = 1e-1
+
+    def __init__(self) -> None:
+        self.vel, self.steer_angle = 5.0, 0.0
+
+    def how_bad_is_steer_angle(self, ranges: npt.NDArray[np.float64], steer_angle: float) -> float:
+        num_beams = ranges.size
+        angles = np.linspace(-self.FOV / 2, self.FOV / 2, num=num_beams)
+        points = np.stack([np.cos(angles) * ranges, np.sin(angles) * ranges], axis=-1)
+        velocity = np.array(
+            [np.cos(steer_angle) * self.vel, np.sin(steer_angle) * self.vel]
+        )
+        closest_distance2: float = ranges[np.argmin(ranges)] ** 2
+
+        # We aim to maintain the closest distance (which should be the wall, if not, well rip)
+        # Compute where we will be in `DT` seconds
+        # If our steering angle is less than epsilon (1e-4). then approximate as traversing a straight line
+        if abs(self.steer_angle) < 1e-6:
+            points -= velocity * self.vel
+            new_closest_distance2 = np.min(np.sum(points * points, axis=-1))
+            return new_closest_distance2 < (self.CAR_WIDTH * 1.3) ** 2 + abs(new_closest_distance2 - closest_distance2)
+        # Otherwise, use R = CAR_LENGTH cot(angle)
+        elif self.steer_angle > 0:
+            radius = self.CAR_LENGTH / np.tan(steer_angle)
+            theta = self.vel * self.DT / radius
+            points -= radius * np.array([np.cos(theta) - 1, np.sin(theta)])
+            rotmat = np.array(
+                [
+                    [np.cos(theta), -np.sin(theta)],
+                    [np.sin(theta), np.cos(theta)],
+                ]
+            )
+
+            points @= rotmat
+            new_closest_distance2 = np.min(np.sum(points * points, axis=-1))
+            return new_closest_distance2 < (self.CAR_WIDTH * 1.3) ** 2 + abs(new_closest_distance2 - closest_distance2)
+        else:
+            radius = -self.CAR_LENGTH / np.tan(steer_angle)
+            theta = self.vel * self.DT / radius
+            points -= radius * np.array([1 - np.cos(theta), np.sin(theta)])
+            rotmat = np.array(
+                [
+                    [np.cos(theta), -np.sin(theta)],
+                    [np.sin(theta), np.cos(theta)],
+                ]
+            )
+
+            points @= rotmat.T
+            new_closest_distance2 = np.min(np.sum(points * points, axis=-1))
+            return new_closest_distance2 < (self.CAR_WIDTH * 1.3) ** 2 + abs(new_closest_distance2 - closest_distance2)
+
+    def process_observation(self, ranges: npt.NDArray[np.float64], ego_odom=None):
+        possible_steering_angles = np.linspace(-np.pi / 2, np.pi / 2, 314)
+        scores = [self.how_bad_is_steer_angle(ranges, angle) for angle in possible_steering_angles]
+        return self.vel, possible_steering_angles[np.argmin(scores)]
+
