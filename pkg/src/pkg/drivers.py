@@ -4,6 +4,14 @@ import numpy.typing as npt
 import numpy as np
 
 
+class PurePursuitDriver:
+    # Function called by the gym
+    def process_observation(self, ranges, ego_odom):
+        steering_angle = ego_odom.heading - pt_heading
+
+        speed = 5.0
+        return speed, steering_angle
+
 class GapFollower:
     BUBBLE_RADIUS = 160
     PREPROCESS_CONV_SIZE = 3
