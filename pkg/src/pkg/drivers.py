@@ -2,12 +2,23 @@ from typing import Optional, Tuple
 import numpy.typing as npt
 
 import numpy as np
+import csv
 
 
 class PurePursuitDriver:
     # Function called by the gym
     def process_observation(self, ranges, ego_odom):
-        steering_angle = ego_odom.heading - pt_heading
+        # Read the raceline points into a dict
+        # Find correct waypoint by calculating straight-line distance between current position and each waypoint in the dict
+            # The "correct" one is the one with the closest distance to the desired lookahead distance
+        # Based on that point, calculate the steering angle
+        # Then choose the speed (either constant, or maybe tied to the steering angle)
+        raceline_pts = {}
+        with csv.reader("maps/SOCHI_centerline.csv", ',') as raceline_pts_file:
+            for row in raceline_pts_file:
+                raceline_pts[]
+
+        steering_angle = ego_odom.poses_theta - pt_heading
 
         speed = 5.0
         return speed, steering_angle
