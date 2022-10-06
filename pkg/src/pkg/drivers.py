@@ -5,12 +5,28 @@ import numpy as np
 
 
 class PurePursuitDriver:
+    def __init__(self) -> None:
+        with open("pkg/maps/SOCHI_centerline.csv", "r") as f:
+            self.waypoints = np.array([list(map(float, i.split(","))) for i in f.read().splitlines()[1:]])
     # Function called by the gym
     def process_observation(self, ranges, ego_odom):
-        steering_angle = ego_odom.heading - pt_heading
+        print("\n\n")
+        v = np.array([np.cos(ego_odom['pose_theta']), np.sin(ego_odom['pose_theta'])])
+        print(v)
+        x = np.array([ego_odom['pose_x'], ego_odom['pose_y']], dtype=np.float64) + v * 0.1
 
-        speed = 5.0
-        return speed, steering_angle
+        # print(self.waypoints.shape)
+        # print(v, x, self.waypoints)
+        print(ego_odom['pose_theta'])
+        nexts = self.waypoints[(np.einsum("ij,j->i", self.waypoints[:, :2] - x, v) > 0) & (np.linalg.norm(self.waypoints[:, :2] - x, axis=1) > 0.1), :2]
+
+        closest = np.argmin(np.linalg.norm(nexts - x, axis=1))
+
+        print(nexts[closest])
+        steering_angle = np.arctan2(nexts[closest][1] - x[1], nexts[closest][0] - x[0])
+
+        speed = 2.0
+        return speed, steering_angle - ego_odom['pose_theta']
 
 class GapFollower:
     BUBBLE_RADIUS = 160
