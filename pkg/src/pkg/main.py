@@ -10,10 +10,10 @@ current_dir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(current_dir)
 
 # import your drivers here
-from .drivers import DisparityExtender
+from .drivers import PurePursuitDriver
 
 # choose your drivers here (1-4)
-drivers = [DisparityExtender()]
+drivers = [PurePursuitDriver()]
 
 # choose your racetrack here (Oschersleben, SOCHI, SOCHI_OBS)
 RACETRACK = 'SOCHI'
