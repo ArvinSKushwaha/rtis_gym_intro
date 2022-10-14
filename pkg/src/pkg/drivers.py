@@ -4,6 +4,7 @@ import numpy.typing as npt
 import numpy as np
 from f110_gym.envs import F110Env
 
+
 def normalize_angle(angle: float) -> float:
     if angle > np.pi:
         angle -= 2 * np.pi
@@ -24,33 +25,34 @@ class PurePursuitDriver:
 
     # Function called by the gym
     def process_observation(self, ranges, ego_odom):
-        print("\n\n")
 
+        # Compute the unit vector of the car's orientation
         v = np.array([np.cos(ego_odom["pose_theta"]), np.sin(ego_odom["pose_theta"])])
-        print(v)
 
-        x = (
-            np.array([ego_odom["pose_x"], ego_odom["pose_y"]], dtype=np.float64)
-            + v * 0.1
-        )
-        nexts = self.waypoints[
-            (np.einsum("ij,j->i", self.waypoints - x, v) > -np.pi / 30.0)
-            & (np.linalg.norm(self.waypoints - x, axis=1) > 0.1)
-        ]
+        # Represent the car's position as a vector
+        x = np.array([ego_odom["pose_x"], ego_odom["pose_y"]], dtype=np.float64)
 
+        # Boolean array indicating which waypoints are in front of the car
+        visible_waypoints = np.einsum("ij,j->i", self.waypoints - x, v) > 0.0
+
+        # Boolean array indicating which waypoints are far enough to use as waypoints
+        far_enough = np.linalg.norm(self.waypoints - x, axis=1) > 1.0
+
+        # Find the possible waypoints
+        nexts = self.waypoints[visible_waypoints & far_enough]
+
+        # Get the closest of the possible waypoints
         closest = np.argmin(np.linalg.norm(nexts - x, axis=1))
 
-        print(nexts[closest])
-        # self.renderer.set_location
+        # Just compute the angle between the car's orientation and the vector to the closest waypoint
+        steering_angle = (
+            np.arctan2(nexts[closest][1] - x[1], nexts[closest][0] - x[0])
+            - ego_odom["pose_theta"]
+        )
 
-        steering_angle = np.arctan2(nexts[closest][1] - x[1], nexts[closest][0] - x[0]) - ego_odom["pose_theta"]
-
-        speed = 1.0
+        speed = 1.2
         return speed, normalize_angle(steering_angle)
 
-    def register(self, env: F110Env) -> None:
-        self.renderer = env.renderer
-        pass
 
 class GapFollower:
     BUBBLE_RADIUS = 160
