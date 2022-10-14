@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Tuple
 import numpy.typing as npt
 
 import numpy as np
@@ -7,26 +7,34 @@ import numpy as np
 class PurePursuitDriver:
     def __init__(self) -> None:
         with open("pkg/maps/SOCHI_centerline.csv", "r") as f:
-            self.waypoints = np.array([list(map(float, i.split(","))) for i in f.read().splitlines()[1:]])
+            self.waypoints = np.array(
+                [list(map(float, i.split(","))) for i in f.read().splitlines()[1:]]
+            )[:, :2]
+
     # Function called by the gym
     def process_observation(self, ranges, ego_odom):
         print("\n\n")
-        v = np.array([np.cos(ego_odom['pose_theta']), np.sin(ego_odom['pose_theta'])])
-        print(v)
-        x = np.array([ego_odom['pose_x'], ego_odom['pose_y']], dtype=np.float64) + v * 0.1
 
-        # print(self.waypoints.shape)
-        # print(v, x, self.waypoints)
-        print(ego_odom['pose_theta'])
-        nexts = self.waypoints[(np.einsum("ij,j->i", self.waypoints[:, :2] - x, v) > 0) & (np.linalg.norm(self.waypoints[:, :2] - x, axis=1) > 0.1), :2]
+        v = np.array([np.cos(ego_odom["pose_theta"]), np.sin(ego_odom["pose_theta"])])
+        print(v)
+
+        x = (
+            np.array([ego_odom["pose_x"], ego_odom["pose_y"]], dtype=np.float64)
+            + v * 0.1
+        )
+        nexts = self.waypoints[
+            (np.einsum("ij,j->i", self.waypoints - x, v) > -np.pi / 30.0)
+            & (np.linalg.norm(self.waypoints - x, axis=1) > 0.1)
+        ]
 
         closest = np.argmin(np.linalg.norm(nexts - x, axis=1))
 
         print(nexts[closest])
-        steering_angle = np.arctan2(nexts[closest][1] - x[1], nexts[closest][0] - x[0])
+        steering_angle = np.arctan2(nexts[closest][1] - x[1], nexts[closest][0] - x[0]) - ego_odom["pose_theta"]
+        steering_angle = np.clip(steering_angle, -np.pi / 6.0, np.pi / 6.0)
 
-        speed = 2.0
-        return speed, steering_angle - ego_odom['pose_theta']
+        speed = 1.0
+        return speed, steering_angle
 
 class GapFollower:
     BUBBLE_RADIUS = 160
@@ -323,24 +331,29 @@ class WallFollower:
     DT: float = 1e-3
     ANGLES = np.linspace(-FOV / 2, FOV / 2, num=1080)
 
-
     def __init__(self) -> None:
         self.vel, self.steer_angle = 15.0, 0.0
 
-    def how_bad_is_steer_angle(self, ranges: npt.NDArray[np.float64], steer_angle: float) -> float:
-        points = np.stack([np.cos(self.ANGLES) * ranges, np.sin(self.ANGLES) * ranges], axis=-1)
+    def how_bad_is_steer_angle(
+        self, ranges: npt.NDArray[np.float64], steer_angle: float
+    ) -> float:
+        points = np.stack(
+            [np.cos(self.ANGLES) * ranges, np.sin(self.ANGLES) * ranges], axis=-1
+        )
         velocity = np.array(
             [np.cos(steer_angle) * self.vel, np.sin(steer_angle) * self.vel]
         )
         closest_distance2: float = ranges[np.argmin(ranges)] ** 2
-    
+
         # We aim to maintain the closest distance (which should be the wall, if not, well rip)
         # Compute where we will be in `DT` seconds
         # If our steering angle is less than epsilon (1e-4). then approximate as traversing a straight line
         if abs(self.steer_angle) < 1e-6:
             points -= velocity * self.vel
             new_closest_distance2 = np.min(np.sum(points * points, axis=-1))
-            return float(new_closest_distance2 < (self.CAR_WIDTH * 1.3) ** 2) * 100 + abs(new_closest_distance2 - closest_distance2)
+            return float(
+                new_closest_distance2 < (self.CAR_WIDTH * 1.3) ** 2
+            ) * 100 + abs(new_closest_distance2 - closest_distance2)
         # Otherwise, use R = CAR_LENGTH cot(angle)
         elif self.steer_angle > 0:
             radius = self.CAR_LENGTH / np.tan(steer_angle)
@@ -352,7 +365,7 @@ class WallFollower:
                     [np.sin(theta), np.cos(theta)],
                 ]
             )
-    
+
         else:
             radius = -self.CAR_LENGTH / np.tan(steer_angle)
             theta = self.vel * self.DT / radius
@@ -366,14 +379,23 @@ class WallFollower:
 
         points @= rotmat
         new_closest_distance2 = np.min(np.sum(points * points, axis=-1))
-        return float(new_closest_distance2 < ((self.CAR_WIDTH ** 2 + self.CAR_LENGTH ** 2)**0.5 * 1.3) ** 2) * 100 + abs(new_closest_distance2 - closest_distance2)
-    
+        return float(
+            new_closest_distance2
+            < ((self.CAR_WIDTH**2 + self.CAR_LENGTH**2) ** 0.5 * 1.3) ** 2
+        ) * 100 + abs(new_closest_distance2 - closest_distance2)
 
-    def process_observation(self, ranges: npt.NDArray[np.float64], ego_odom=None) -> Tuple[float, float]:
+    def process_observation(
+        self, ranges: npt.NDArray[np.float64], ego_odom=None
+    ) -> Tuple[float, float]:
         possible_steering_angles = np.linspace(0, np.sqrt(np.pi) / np.sqrt(8), 32)
-        possible_steering_angles = np.hstack([-possible_steering_angles ** 2, possible_steering_angles ** 2])
-        
-        scores = [self.how_bad_is_steer_angle(ranges, angle) for angle in possible_steering_angles]
+        possible_steering_angles = np.hstack(
+            [-(possible_steering_angles**2), possible_steering_angles**2]
+        )
+
+        scores = [
+            self.how_bad_is_steer_angle(ranges, angle)
+            for angle in possible_steering_angles
+        ]
         # print(scores)
         idx = np.argmin(scores)
         angle = possible_steering_angles[idx]
