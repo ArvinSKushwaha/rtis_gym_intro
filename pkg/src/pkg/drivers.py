@@ -17,6 +17,9 @@ def normalize_angle(angle: float) -> float:
 
 
 class PurePursuitDriver:
+    WHEELBASE_LENGTH = 0.3302
+    MIN_LOOKAHEAD = 1.0
+
     def __init__(self) -> None:
         with open("pkg/maps/SOCHI_centerline.csv", "r") as f:
             self.waypoints = np.array(
@@ -25,7 +28,6 @@ class PurePursuitDriver:
 
     # Function called by the gym
     def process_observation(self, ranges, ego_odom):
-
         # Compute the unit vector of the car's orientation
         v = np.array([np.cos(ego_odom["pose_theta"]), np.sin(ego_odom["pose_theta"])])
 
@@ -36,22 +38,27 @@ class PurePursuitDriver:
         visible_waypoints = np.einsum("ij,j->i", self.waypoints - x, v) > 0.0
 
         # Boolean array indicating which waypoints are far enough to use as waypoints
-        far_enough = np.linalg.norm(self.waypoints - x, axis=1) > 1.0
+        far_enough = np.linalg.norm(self.waypoints - x, axis=1) > self.MIN_LOOKAHEAD
 
         # Find the possible waypoints
         nexts = self.waypoints[visible_waypoints & far_enough]
 
         # Get the closest of the possible waypoints
-        closest = np.argmin(np.linalg.norm(nexts - x, axis=1))
+        closest_idx = np.argmin(np.linalg.norm(nexts - x, axis=1))
+        closest = nexts[closest_idx] - x
 
         # Just compute the angle between the car's orientation and the vector to the closest waypoint
-        steering_angle = (
-            np.arctan2(nexts[closest][1] - x[1], nexts[closest][0] - x[0])
+        alpha = normalize_angle(
+            np.arctan2(closest[1], closest[0])
             - ego_odom["pose_theta"]
         )
 
-        speed = 1.2
-        return speed, normalize_angle(steering_angle)
+        lookahead_distance = np.linalg.norm(closest)
+
+        steering_angle = np.arctan2(2 * self.WHEELBASE_LENGTH * np.sin(alpha), lookahead_distance)
+
+        speed = 2.0
+        return speed, steering_angle
 
 
 class GapFollower:
