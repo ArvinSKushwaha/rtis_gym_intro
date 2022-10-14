@@ -6,18 +6,20 @@ import csv
 
 
 class PurePursuitDriver:
+    def __init__(self) -> None:
+        # Read the raceline points into a list
+        self.raceline_pts = []
+        with open('pkg/maps/SOCHI_centerline.csv') as raceline_file:
+            raceline_reader = csv.reader(raceline_file)
+            for row in raceline_reader:
+                self.raceline_pts.append([row[0], row[1]])
+
     # Function called by the gym
     def process_observation(self, ranges, ego_odom=None):
-        # Read the raceline points into a list
         # Find correct waypoint by calculating straight-line distance between current position and each waypoint in the dict
             # The "correct" one is the one with the closest distance to the desired lookahead distance
         # Based on that point, calculate the steering angle
         # Then choose the speed (either constant, or maybe tied to the steering angle)
-        raceline_pts = {}
-        with open('pkg/maps/SOCHI_centerline.csv') as raceline_file:
-            raceline_reader = csv.reader(raceline_file)
-            for idx, row in enumerate(raceline_reader):
-                raceline_pts[idx] = (row[0], row[1])
 
         steering_angle = ego_odom.get('pose_theta') # TODO: Finish calculating steering angle
         print(type(steering_angle)) # Test code
