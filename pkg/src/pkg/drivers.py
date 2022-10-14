@@ -4,6 +4,7 @@ import numpy.typing as npt
 import numpy as np
 from f110_gym.envs import F110Env
 import csv
+import math
 
 
 def normalize_angle(angle: float) -> float:
@@ -20,6 +21,11 @@ def normalize_angle(angle: float) -> float:
 class PurePursuitDriver:
     WHEELBASE_LENGTH = 0.3302
     MIN_LOOKAHEAD = 1.0
+    K = 10
+    C = 1
+    SPEED_MIN = 2
+    TURN_MAX = 0.4189 # in radians
+    R = K / ( SPEED_MIN * (TURN_MAX + C) )
 
     def __init__(self) -> None:
         self.raceline_pts = []
@@ -29,6 +35,7 @@ class PurePursuitDriver:
                 self.raceline_pts.append([float(row[0]), float(row[1])])        
         
         self.waypoints = np.array(self.raceline_pts)
+
 
     # Function called by the gym
     def process_observation(self, ranges, ego_odom):
@@ -61,7 +68,11 @@ class PurePursuitDriver:
 
         steering_angle = np.arctan2(2 * self.WHEELBASE_LENGTH * np.sin(alpha), lookahead_distance)
 
-        speed = 2.0
+        # Calculate speed based on current turning angle
+        offset = 1
+        k = 10
+        speed = k / (self.R * 0.5 * abs(steering_angle) + offset)
+        print(speed)
         return speed, steering_angle
 
 
