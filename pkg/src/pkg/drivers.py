@@ -3,6 +3,7 @@ import numpy.typing as npt
 
 import numpy as np
 from f110_gym.envs import F110Env
+import csv
 
 
 def normalize_angle(angle: float) -> float:
@@ -21,10 +22,13 @@ class PurePursuitDriver:
     MIN_LOOKAHEAD = 1.0
 
     def __init__(self) -> None:
-        with open("pkg/maps/SOCHI_centerline.csv", "r") as f:
-            self.waypoints = np.array(
-                [list(map(float, i.split(","))) for i in f.read().splitlines()[1:]]
-            )[:, :2]
+        self.raceline_pts = []
+        with open('pkg/maps/SOCHI_centerline.csv') as raceline_file:
+            raceline_reader = csv.reader(raceline_file)
+            for row in raceline_reader:
+                self.raceline_pts.append([float(row[0]), float(row[1])])        
+        
+        self.waypoints = np.array(self.raceline_pts)
 
     # Function called by the gym
     def process_observation(self, ranges, ego_odom):
