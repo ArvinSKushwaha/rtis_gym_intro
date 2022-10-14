@@ -2,6 +2,17 @@ from typing import Tuple
 import numpy.typing as npt
 
 import numpy as np
+from f110_gym.envs import F110Env
+
+def normalize_angle(angle: float) -> float:
+    if angle > np.pi:
+        angle -= 2 * np.pi
+        return normalize_angle(angle)
+    elif angle < -np.pi:
+        angle += 2 * np.pi
+        return normalize_angle(angle)
+    else:
+        return angle
 
 
 class PurePursuitDriver:
@@ -30,11 +41,16 @@ class PurePursuitDriver:
         closest = np.argmin(np.linalg.norm(nexts - x, axis=1))
 
         print(nexts[closest])
+        # self.renderer.set_location
+
         steering_angle = np.arctan2(nexts[closest][1] - x[1], nexts[closest][0] - x[0]) - ego_odom["pose_theta"]
-        steering_angle = np.clip(steering_angle, -np.pi / 6.0, np.pi / 6.0)
 
         speed = 1.0
-        return speed, steering_angle
+        return speed, normalize_angle(steering_angle)
+
+    def register(self, env: F110Env) -> None:
+        self.renderer = env.renderer
+        pass
 
 class GapFollower:
     BUBBLE_RADIUS = 160
