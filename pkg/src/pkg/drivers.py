@@ -20,10 +20,12 @@ def normalize_angle(angle: float) -> float:
 
 class PurePursuitDriver:
     WHEELBASE_LENGTH = 0.3302
-    MIN_LOOKAHEAD = 1.0
+    MIN_LOOKAHEAD = 1.5
+    LOOKAHEAD_CONST = 0.3
     K = 10
     C = 1
-    SPEED_MIN = 2
+    # SPEED_MIN = 2
+    SPEED_MIN = 1
     TURN_MAX = 0.4189 # in radians
     R = K / ( SPEED_MIN * (TURN_MAX + C) )
 
@@ -48,8 +50,17 @@ class PurePursuitDriver:
         # Boolean array indicating which waypoints are in front of the car
         visible_waypoints = np.einsum("ij,j->i", self.waypoints - x, v) > 0.0
 
+        # far_enough = np.linalg.norm(self.waypoints - x, axis=1) > self.MIN_LOOKAHEAD
+        # Calculate the lookahead modifier
+        # TODO: for future improvement, this calculation should allow the lookahead modifier to go below 1, allowing for more precise control in corners
+        lookahead_modifier = self.LOOKAHEAD_CONST * ((ego_odom.get("linear_vel_x")**2 + ego_odom.get("linear_vel_y")**2) / 10)
+
+        # Lookaheads below MIN_LOOKAHEAD aren't useful, so throw them away
+        if lookahead_modifier < 1:
+            lookahead_modifier = 1
+
         # Boolean array indicating which waypoints are far enough to use as waypoints
-        far_enough = np.linalg.norm(self.waypoints - x, axis=1) > self.MIN_LOOKAHEAD
+        far_enough = np.linalg.norm(self.waypoints - x, axis=1) > (self.MIN_LOOKAHEAD * lookahead_modifier)
 
         # Find the possible waypoints
         nexts = self.waypoints[visible_waypoints & far_enough]
@@ -72,7 +83,7 @@ class PurePursuitDriver:
         offset = 1
         k = 10
         speed = k / (self.R * 0.5 * abs(steering_angle) + offset)
-        print(speed)
+        # print(speed)
         return speed, steering_angle
 
 
