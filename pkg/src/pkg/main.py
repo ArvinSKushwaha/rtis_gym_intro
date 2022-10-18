@@ -16,7 +16,7 @@ from .drivers import PurePursuitDriver
 drivers = [PurePursuitDriver()]
 
 # choose your racetrack here (Oschersleben, SOCHI, SOCHI_OBS)
-RACETRACK = 'SOCHI'
+RACETRACK = 'maps/map0'
 
 
 def _pack_odom(obs, i):
@@ -51,7 +51,8 @@ class GymRunner(object):
             elif 'Oschersleben'.lower() in RACETRACK.lower():
                 poses = np.array([[0.0702245, 0.3002981, 2.79787]])
             else:
-                raise ValueError("Initial position is unknown for map '{}'.".format(RACETRACK))
+                poses = np.array([[0.0, 0.0, 0.0]])
+                # raise ValueError("Initial position is unknown for map '{}'.".format(RACETRACK))
         elif driver_count == 2:
             if 'SOCHI'.lower() in RACETRACK.lower():
                 poses = np.array([
