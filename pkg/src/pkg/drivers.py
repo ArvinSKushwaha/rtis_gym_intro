@@ -6,7 +6,7 @@ from f110_gym.envs import F110Env
 import csv
 import math
 
-
+# Normalizes the angle to be between -pi and pi
 def normalize_angle(angle: float) -> float:
     if angle > np.pi:
         angle -= 2 * np.pi
@@ -17,7 +17,7 @@ def normalize_angle(angle: float) -> float:
     else:
         return angle
 
-
+# Our implementation of the pure pursuit algorithm
 class PurePursuitDriver:
     WHEELBASE_LENGTH = 0.3302
     MIN_LOOKAHEAD = 1.5
@@ -29,9 +29,11 @@ class PurePursuitDriver:
     TURN_MAX = 0.4189 # in radians
     R = K / ( SPEED_MIN * (TURN_MAX + C) )
 
+    # Reads in a set of waypoints from the waypoints file into a numpy array
     def __init__(self) -> None:
         self.raceline_pts = []
         with open('pkg/maps/SOCHI_centerline.csv') as raceline_file:
+        #with open('pkg/maps/raceline.csv') as raceline_file:
             raceline_reader = csv.reader(raceline_file)
             for row in raceline_reader:
                 self.raceline_pts.append([float(row[0]), float(row[1])])        
@@ -75,15 +77,17 @@ class PurePursuitDriver:
             - ego_odom["pose_theta"]
         )
 
+        # Get the true lookahead distance (the distance from the car to the current lookahead point)
         lookahead_distance = np.linalg.norm(closest)
 
+        # Calculate the steering angle according to the pure pursuit algorithm
         steering_angle = np.arctan2(2 * self.WHEELBASE_LENGTH * np.sin(alpha), lookahead_distance)
 
-        # Calculate speed based on current turning angle
+        # Calculate speed based on current turning angle (this is a really really bad way to do this)
         offset = 1
         k = 10
         speed = k / (self.R * 0.5 * abs(steering_angle) + offset)
-        # print(speed)
+        print(speed) # for debugging
         return speed, steering_angle
 
 
