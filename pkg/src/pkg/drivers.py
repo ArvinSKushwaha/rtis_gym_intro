@@ -34,7 +34,7 @@ class PurePursuitDriver:
         self.raceline_pts = []
         self.speed_targets = []
         # with open('pkg/maps/SOCHI_centerline.csv') as raceline_file:
-        with open('pkg/maps/extractedPts.csv') as raceline_file:
+        with open('pkg/maps/waypoints_with_speed.csv') as raceline_file:
             raceline_reader = csv.reader(raceline_file)
             for row in raceline_reader:
                 self.raceline_pts.append([float(row[0]), float(row[1])])        
