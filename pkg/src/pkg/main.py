@@ -11,6 +11,7 @@ sys.path.append(current_dir)
 
 # import your drivers here
 from .drivers import PurePursuitDriver
+from .drivers import DisparityExtender
 
 # choose your drivers here (1-4)
 drivers = [PurePursuitDriver()]
@@ -50,6 +51,8 @@ class GymRunner(object):
                 poses = np.array([[0.8007017, -0.2753365, 4.1421595]])
             elif 'Oschersleben'.lower() in RACETRACK.lower():
                 poses = np.array([[0.0702245, 0.3002981, 2.79787]])
+            elif 'bag_map'.lower() in RACETRACK.lower():
+                poses = np.array([[0.0702245, 0.3002981, 2.79787]])
             else:
                 raise ValueError("Initial position is unknown for map '{}'.".format(RACETRACK))
         elif driver_count == 2:
@@ -62,6 +65,11 @@ class GymRunner(object):
                 poses = np.array([
                     [0.0702245, 0.3002981, 2.79787],
                     [0.9966514, -0.9306893, 2.79787],
+                ])
+            elif 'bag_map'.lower() in RACETRACK.lower():
+                poses = np.array([
+                    [2.0702245, 4.8002981, 2.79787],
+                    [-0.9966514, -2.9306893, 2.79787],
                 ])
             else:
                 raise ValueError("Initial positions are unknown for map '{}'.".format(RACETRACK))

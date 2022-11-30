@@ -32,13 +32,17 @@ class PurePursuitDriver:
     # Reads in a set of waypoints from the waypoints file into a numpy array
     def __init__(self) -> None:
         self.raceline_pts = []
-        with open('pkg/maps/SOCHI_centerline.csv') as raceline_file:
-        #with open('pkg/maps/raceline.csv') as raceline_file:
+        self.speed_targets = []
+        # with open('pkg/maps/SOCHI_centerline.csv') as raceline_file:
+        with open('pkg/maps/extractedPts.csv') as raceline_file:
             raceline_reader = csv.reader(raceline_file)
             for row in raceline_reader:
                 self.raceline_pts.append([float(row[0]), float(row[1])])        
+                print(row[0])
+                self.speed_targets.append(float(row[2]))
         
         self.waypoints = np.array(self.raceline_pts)
+        self.speed_targets = np.array(self.speed_targets)
 
 
     # Function called by the gym
@@ -66,16 +70,22 @@ class PurePursuitDriver:
 
         # Find the possible waypoints
         nexts = self.waypoints[visible_waypoints & far_enough]
+        next_speed_targets = self.speed_targets[visible_waypoints & far_enough]
 
         # Get the closest of the possible waypoints
         closest_idx = np.argmin(np.linalg.norm(nexts - x, axis=1))
         closest = nexts[closest_idx] - x
+        print(nexts[closest_idx])
 
         # Just compute the angle between the car's orientation and the vector to the closest waypoint
         alpha = normalize_angle(
             np.arctan2(closest[1], closest[0])
             - ego_odom["pose_theta"]
         )
+
+        # Get the speed target associated with the chosen point
+        print(closest_idx)
+        speed_target = next_speed_targets[closest_idx]
 
         # Get the true lookahead distance (the distance from the car to the current lookahead point)
         lookahead_distance = np.linalg.norm(closest)
@@ -88,7 +98,8 @@ class PurePursuitDriver:
         k = 10
         speed = k / (self.R * 0.5 * abs(steering_angle) + offset)
         print(speed) # for debugging
-        return speed, steering_angle
+        print(speed_target) # for debugging
+        return speed_target, steering_angle
 
 
 class GapFollower:
